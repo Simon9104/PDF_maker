@@ -15,9 +15,9 @@ permissions:
   contents: write
 
 jobs:
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
+  build-macos-intel:
+    name: Build macOS (Intel x86_64)
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
 
@@ -34,25 +34,46 @@ jobs:
 
       - name: Create DMG
         run: |
-          brew install create-dmg || true
-          create-dmg \
-            --volname "CustomerTableGenerator" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --app-drop-link 450 185 \
-            "CustomerTableGenerator-macOS.dmg" \
-            "dist/CustomerTableGenerator.app" || \
           hdiutil create -volname "CustomerTableGenerator" \
             -srcfolder dist/CustomerTableGenerator.app \
             -ov -format UDZO \
-            CustomerTableGenerator-macOS.dmg
+            CustomerTableGenerator-macOS-Intel.dmg
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macos-dmg
-          path: CustomerTableGenerator-macOS.dmg
+          name: macos-dmg-intel
+          path: CustomerTableGenerator-macOS-Intel.dmg
+
+  build-macos-arm:
+    name: Build macOS (Apple Silicon arm64)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install reportlab pyinstaller
+
+      - name: Build .app bundle
+        run: pyinstaller app.spec
+
+      - name: Create DMG
+        run: |
+          hdiutil create -volname "CustomerTableGenerator" \
+            -srcfolder dist/CustomerTableGenerator.app \
+            -ov -format UDZO \
+            CustomerTableGenerator-macOS-AppleSilicon.dmg
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg-arm
+          path: CustomerTableGenerator-macOS-AppleSilicon.dmg
 
   build-windows:
     name: Build Windows
@@ -84,7 +105,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-macos, build-windows]
+    needs: [build-macos-intel, build-macos-arm, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -104,13 +125,21 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Delete tag locally if it already exists from a previous failed run
+          git tag -d ${{ steps.tag.outputs.name }} 2>/dev/null || true
+          git push origin :refs/tags/${{ steps.tag.outputs.name }} 2>/dev/null || true
           git tag ${{ steps.tag.outputs.name }}
           git push origin ${{ steps.tag.outputs.name }}
 
-      - name: Download macOS artifact
+      - name: Download macOS Intel artifact
         uses: actions/download-artifact@v4
         with:
-          name: macos-dmg
+          name: macos-dmg-intel
+
+      - name: Download macOS Apple Silicon artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg-arm
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
@@ -136,19 +165,24 @@ jobs:
             ### Downloads
             | Platform | File |
             |----------|------|
-            | macOS | `CustomerTableGenerator-macOS.dmg` |
+            | macOS — Intel (2019 and older) | `CustomerTableGenerator-macOS-Intel.dmg` |
+            | macOS — Apple Silicon M1/M2/M3/M4 | `CustomerTableGenerator-macOS-AppleSilicon.dmg` |
             | Windows | `CustomerTableGenerator-Windows.zip` (extract and run the `.exe`) |
 
+            > **Not sure which Mac you have?**  
+            > Apple menu → About This Mac → look for "Intel" or "Apple M1/M2/M3"
+
             ### macOS install
-            1. Open the `.dmg`
+            1. Open the correct `.dmg` for your chip
             2. Drag **CustomerTableGenerator** to Applications
-            3. Right-click → Open on first launch (Gatekeeper)
+            3. Right-click → Open on first launch (Gatekeeper warning)
 
             ### Windows install
             1. Extract the `.zip`
             2. Double-click `CustomerTableGenerator.exe`
           files: |
-            CustomerTableGenerator-macOS.dmg
+            CustomerTableGenerator-macOS-Intel.dmg
+            CustomerTableGenerator-macOS-AppleSilicon.dmg
             CustomerTableGenerator-Windows.zip
           draft: false
           prerelease: false
