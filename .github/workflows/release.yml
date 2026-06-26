@@ -1,0 +1,127 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install reportlab pyinstaller
+
+      - name: Build .app bundle
+        run: pyinstaller app.spec
+
+      - name: Create DMG
+        run: |
+          brew install create-dmg || true
+          create-dmg \
+            --volname "CustomerTableGenerator" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --app-drop-link 450 185 \
+            "CustomerTableGenerator-macOS.dmg" \
+            "dist/CustomerTableGenerator.app" || \
+          hdiutil create -volname "CustomerTableGenerator" \
+            -srcfolder dist/CustomerTableGenerator.app \
+            -ov -format UDZO \
+            CustomerTableGenerator-macOS.dmg
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: CustomerTableGenerator-macOS.dmg
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install reportlab pyinstaller
+
+      - name: Build .exe
+        run: pyinstaller app.spec
+
+      - name: Zip Windows build
+        run: |
+          Compress-Archive -Path dist\CustomerTableGenerator.exe -DestinationPath CustomerTableGenerator-Windows.zip
+        shell: pwsh
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: CustomerTableGenerator-Windows.zip
+
+  release:
+    name: Create GitHub Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-exe
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Customer Table Generator ${{ github.ref_name }}"
+          body: |
+            ## Customer Table Generator ${{ github.ref_name }}
+
+            A desktop app to create professional customer tables and export them as PDF.
+
+            ### Features
+            - Set a custom headline, subtitle, and footer
+            - Add/edit/remove columns and rows
+            - Preview table before export
+            - Export a professionally formatted PDF
+
+            ### Downloads
+            | Platform | File |
+            |----------|------|
+            | macOS | `CustomerTableGenerator-macOS.dmg` |
+            | Windows | `CustomerTableGenerator-Windows.zip` (extract and run the `.exe`) |
+
+            ### macOS install
+            1. Open the `.dmg`
+            2. Drag **CustomerTableGenerator** to Applications
+            3. Right-click → Open on first launch (Gatekeeper)
+
+            ### Windows install
+            1. Extract the `.zip`
+            2. Double-click `CustomerTableGenerator.exe`
+          files: |
+            CustomerTableGenerator-macOS.dmg
+            CustomerTableGenerator-Windows.zip
+          draft: false
+          prerelease: false
