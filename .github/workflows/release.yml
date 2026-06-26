@@ -87,6 +87,26 @@ jobs:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create git tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.tag.outputs.name }}
+          git push origin ${{ steps.tag.outputs.name }}
+
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
@@ -100,9 +120,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Customer Table Generator ${{ github.ref_name || inputs.tag }}"
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: "Customer Table Generator ${{ steps.tag.outputs.name }}"
           body: |
-            ## Customer Table Generator ${{ github.ref_name }}
+            ## Customer Table Generator ${{ steps.tag.outputs.name }}
 
             A desktop app to create professional customer tables and export them as PDF.
 
