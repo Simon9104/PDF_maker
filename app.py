@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-import os, sys
+import os, sys, random, string
 from datetime import date
 
 try:
@@ -15,12 +15,17 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
-# ── Colour palette (matches the invoice sample) ───────────────────────────────
-C_ACCENT   = colors.HexColor("#1a5fa8")   # blue headers
-C_DARK     = colors.HexColor("#1c2b3a")   # dark text
-C_LIGHT_BG = colors.HexColor("#f0f4f8")   # alternating row
-C_TOTAL_BG = colors.HexColor("#1a5fa8")   # "amount due" row
+C_ACCENT   = colors.HexColor("#1a5fa8")
+C_DARK     = colors.HexColor("#1c2b3a")
+C_LIGHT_BG = colors.HexColor("#f0f4f8")
+C_TOTAL_BG = colors.HexColor("#1a5fa8")
 C_BORDER   = colors.HexColor("#c8d6e5")
+
+
+def _generate_doc_number():
+    today = date.today()
+    suffix = ''.join(random.choices(string.digits, k=4))
+    return f"{today.year}{today.month:02d}{suffix}"
 
 
 class CustomerTableApp:
@@ -32,7 +37,6 @@ class CustomerTableApp:
         self._setup_style()
         self._build_ui()
 
-    # ── Style ──────────────────────────────────────────────────────────────────
     def _setup_style(self):
         s = ttk.Style()
         try:
@@ -44,9 +48,7 @@ class CustomerTableApp:
         s.configure("Primary.TButton", font=("Helvetica", 10, "bold"), padding=7)
         s.configure("Action.TButton",  font=("Helvetica", 10), padding=6)
 
-    # ── Main UI ────────────────────────────────────────────────────────────────
     def _build_ui(self):
-        # Top bar
         bar = ttk.Frame(self.root, padding=(10, 6))
         bar.pack(fill="x")
         ttk.Label(bar, text="Invoice / Document Generator", style="H.TLabel").pack(side="left")
@@ -56,7 +58,6 @@ class CustomerTableApp:
                    command=self._preview).pack(side="right", padx=4)
         ttk.Separator(self.root).pack(fill="x")
 
-        # Notebook tabs
         nb = ttk.Notebook(self.root)
         nb.pack(fill="both", expand=True, padx=8, pady=8)
 
@@ -66,7 +67,6 @@ class CustomerTableApp:
         self._tab_items(nb)
         self._tab_totals(nb)
 
-    # ── Tab helpers ────────────────────────────────────────────────────────────
     def _field(self, parent, label, var, row, col=0, width=30, colspan=1):
         ttk.Label(parent, text=label).grid(row=row, column=col*2,
                                             sticky="w", padx=6, pady=3)
@@ -99,25 +99,42 @@ class CustomerTableApp:
         self.sup_email   = tk.StringVar()
         self.sup_web     = tk.StringVar()
 
+        # Toggles for optional supplier sections
+        self.show_sup_ids     = tk.BooleanVar(value=True)
+        self.show_sup_banking = tk.BooleanVar(value=True)
+        self.show_sup_contact = tk.BooleanVar(value=True)
+
         self._field(f, "Company name",  self.sup_name,    1, 0)
         self._field(f, "Street",        self.sup_street,  2, 0)
         self._field(f, "City / ZIP",    self.sup_city,    3, 0)
         self._field(f, "Country",       self.sup_country, 4, 0)
+
         ttk.Separator(f, orient="horizontal").grid(
             row=5, column=0, columnspan=4, sticky="ew", pady=8)
-        self._field(f, "ID / IČO",      self.sup_ico,     6, 0)
-        self._field(f, "Tax ID / DIČ",  self.sup_dic,     7, 0)
-        self._field(f, "VAT ID / IČ DPH", self.sup_icdph, 8, 0)
+        ttk.Checkbutton(f, text="Include registration IDs (IČO / DIČ / VAT)",
+                        variable=self.show_sup_ids).grid(
+            row=6, column=0, columnspan=4, sticky="w", padx=6)
+        self._field(f, "ID / IČO",        self.sup_ico,    7, 0)
+        self._field(f, "Tax ID / DIČ",    self.sup_dic,    8, 0)
+        self._field(f, "VAT ID / IČ DPH", self.sup_icdph,  9, 0)
+
         ttk.Separator(f, orient="horizontal").grid(
-            row=9, column=0, columnspan=4, sticky="ew", pady=8)
-        self._field(f, "IBAN",          self.sup_iban,   10, 0, width=40)
-        self._field(f, "SWIFT / BIC",   self.sup_swift,  11, 0)
-        self._field(f, "Bank",          self.sup_bank,   12, 0)
+            row=10, column=0, columnspan=4, sticky="ew", pady=8)
+        ttk.Checkbutton(f, text="Include banking details (IBAN / SWIFT)",
+                        variable=self.show_sup_banking).grid(
+            row=11, column=0, columnspan=4, sticky="w", padx=6)
+        self._field(f, "IBAN",          self.sup_iban,   12, 0, width=40)
+        self._field(f, "SWIFT / BIC",   self.sup_swift,  13, 0)
+        self._field(f, "Bank",          self.sup_bank,   14, 0)
+
         ttk.Separator(f, orient="horizontal").grid(
-            row=13, column=0, columnspan=4, sticky="ew", pady=8)
-        self._field(f, "Phone",         self.sup_phone,  14, 0)
-        self._field(f, "E-mail",        self.sup_email,  15, 0)
-        self._field(f, "Website",       self.sup_web,    16, 0)
+            row=15, column=0, columnspan=4, sticky="ew", pady=8)
+        ttk.Checkbutton(f, text="Include contact info (phone / email / web)",
+                        variable=self.show_sup_contact).grid(
+            row=16, column=0, columnspan=4, sticky="w", padx=6)
+        self._field(f, "Phone",         self.sup_phone,  17, 0)
+        self._field(f, "E-mail",        self.sup_email,  18, 0)
+        self._field(f, "Website",       self.sup_web,    19, 0)
 
     # ── Tab 2: Customer ────────────────────────────────────────────────────────
     def _tab_customer(self, nb):
@@ -135,14 +152,21 @@ class CustomerTableApp:
         self.cus_ico     = tk.StringVar()
         self.cus_dic     = tk.StringVar()
 
+        # Toggle for customer billing IDs
+        self.show_cus_ids = tk.BooleanVar(value=True)
+
         self._field(f, "Company / Name", self.cus_name,    1, 0)
         self._field(f, "Street",         self.cus_street,  2, 0)
         self._field(f, "City / ZIP",     self.cus_city,    3, 0)
         self._field(f, "Country",        self.cus_country, 4, 0)
+
         ttk.Separator(f, orient="horizontal").grid(
             row=5, column=0, columnspan=2, sticky="ew", pady=8)
-        self._field(f, "ID / IČO",       self.cus_ico,     6, 0)
-        self._field(f, "Tax ID / DIČ",   self.cus_dic,     7, 0)
+        ttk.Checkbutton(f, text="Include billing IDs (IČO / DIČ)",
+                        variable=self.show_cus_ids).grid(
+            row=6, column=0, columnspan=2, sticky="w", padx=6)
+        self._field(f, "ID / IČO",       self.cus_ico,     7, 0)
+        self._field(f, "Tax ID / DIČ",   self.cus_dic,     8, 0)
 
     # ── Tab 3: Document meta ───────────────────────────────────────────────────
     def _tab_meta(self, nb):
@@ -155,28 +179,47 @@ class CustomerTableApp:
             row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
 
         today = date.today().strftime("%d.%m.%Y")
-        self.doc_title      = tk.StringVar(value="INVOICE")
-        self.doc_number     = tk.StringVar(value="2024001")
-        self.doc_issue      = tk.StringVar(value=today)
-        self.doc_due        = tk.StringVar(value="")
-        self.doc_var_sym    = tk.StringVar(value="2024001")
-        self.doc_payment    = tk.StringVar(value="Bank transfer")
-        self.doc_currency   = tk.StringVar(value="€")
-        self.doc_note       = tk.StringVar(value="")
+        self.doc_title    = tk.StringVar(value="INVOICE")
+        self.doc_number   = tk.StringVar(value=_generate_doc_number())
+        self.doc_issue    = tk.StringVar(value=today)
+        self.doc_due      = tk.StringVar(value="")
+        self.doc_var_sym  = tk.StringVar(value=self.doc_number.get())
+        self.doc_payment  = tk.StringVar(value="Bank transfer")
+        self.doc_currency = tk.StringVar(value="€")
+        self.doc_note     = tk.StringVar(value="")
 
-        self._field(f, "Document title",    self.doc_title,    1)
-        self._field(f, "Document number",   self.doc_number,   2)
-        self._field(f, "Issue date",        self.doc_issue,    3)
-        self._field(f, "Due date",          self.doc_due,      4)
-        self._field(f, "Variable symbol",   self.doc_var_sym,  5)
-        self._field(f, "Payment method",    self.doc_payment,  6)
-        self._field(f, "Currency symbol",   self.doc_currency, 7)
+        # Row 1: title + generate button
+        ttk.Label(f, text="Document title").grid(row=1, column=0, sticky="w", padx=6, pady=3)
+        ttk.Entry(f, textvariable=self.doc_title, width=30).grid(
+            row=1, column=1, sticky="ew", padx=6, pady=3)
+
+        # Row 2: document number + generate button
+        ttk.Label(f, text="Document number").grid(row=2, column=0, sticky="w", padx=6, pady=3)
+        num_frame = ttk.Frame(f)
+        num_frame.grid(row=2, column=1, sticky="ew", padx=6, pady=3)
+        num_frame.columnconfigure(0, weight=1)
+        ttk.Entry(num_frame, textvariable=self.doc_number, width=22).grid(
+            row=0, column=0, sticky="ew")
+        ttk.Button(num_frame, text="Generate ID", command=self._generate_id).grid(
+            row=0, column=1, padx=(4, 0))
+
+        self._field(f, "Issue date",      self.doc_issue,   3)
+        self._field(f, "Due date",        self.doc_due,     4)
+        self._field(f, "Variable symbol", self.doc_var_sym, 5)
+        self._field(f, "Payment method",  self.doc_payment, 6)
+        self._field(f, "Currency symbol", self.doc_currency,7)
+
         ttk.Separator(f, orient="horizontal").grid(
             row=8, column=0, columnspan=4, sticky="ew", pady=8)
         ttk.Label(f, text="Note / Description:").grid(
             row=9, column=0, sticky="nw", padx=6)
         self.note_text = tk.Text(f, height=4, width=50, font=("Helvetica", 10))
         self.note_text.grid(row=9, column=1, sticky="ew", padx=6, pady=3)
+
+    def _generate_id(self):
+        new_id = _generate_doc_number()
+        self.doc_number.set(new_id)
+        self.doc_var_sym.set(new_id)
 
     # ── Tab 4: Items table ────────────────────────────────────────────────────
     def _tab_items(self, nb):
@@ -185,7 +228,6 @@ class CustomerTableApp:
 
         ttk.Label(f, text="Line Items", style="Sec.TLabel").pack(anchor="w", pady=(0, 8))
 
-        # Column config
         col_frame = ttk.Frame(f)
         col_frame.pack(fill="x", pady=(0, 8))
         ttk.Label(col_frame, text="Add column:").pack(side="left")
@@ -198,9 +240,13 @@ class CustomerTableApp:
                                        font=("Helvetica", 9))
         self.col_listbox.pack(fill="x")
 
+        # Toggle for price column in PDF
+        self.show_prices = tk.BooleanVar(value=True)
+        ttk.Checkbutton(f, text="Show prices / amounts in PDF",
+                        variable=self.show_prices).pack(anchor="w", pady=(4, 0))
+
         ttk.Separator(f).pack(fill="x", pady=8)
 
-        # Treeview
         tree_frame = ttk.Frame(f)
         tree_frame.pack(fill="both", expand=True)
         self.tree = ttk.Treeview(tree_frame, show="headings", selectmode="browse")
@@ -220,7 +266,6 @@ class CustomerTableApp:
         ttk.Button(btns, text="Delete Row", command=self._delete_row).pack(side="left", padx=(0, 4))
         ttk.Button(btns, text="Clear All",  command=self._clear_rows).pack(side="left")
 
-        # Default columns
         for c in ["Description", "Qty", "Unit Price", "Total"]:
             self.col_listbox.insert("end", c)
         self._refresh_columns()
@@ -234,22 +279,27 @@ class CustomerTableApp:
         ttk.Label(f, text="Summary & Tax Settings", style="Sec.TLabel").grid(
             row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
 
-        self.tax_label    = tk.StringVar(value="VAT")
-        self.tax_rate     = tk.StringVar(value="10")
-        self.tax_enabled  = tk.BooleanVar(value=True)
+        self.tax_label      = tk.StringVar(value="VAT")
+        self.tax_rate       = tk.StringVar(value="10")
+        self.tax_enabled    = tk.BooleanVar(value=True)
+        self.show_totals    = tk.BooleanVar(value=True)
         self.subtotal_label = tk.StringVar(value="Subtotal")
         self.total_label    = tk.StringVar(value="Total incl. tax")
         self.due_label      = tk.StringVar(value="Amount Due")
 
-        ttk.Checkbutton(f, text="Show tax row", variable=self.tax_enabled).grid(
+        ttk.Checkbutton(f, text="Show totals section in PDF",
+                        variable=self.show_totals).grid(
             row=1, column=0, columnspan=2, sticky="w", padx=6, pady=3)
-        self._field(f, "Tax label (e.g. VAT)", self.tax_label,      2)
-        self._field(f, "Tax rate %",           self.tax_rate,       3, width=10)
+        ttk.Checkbutton(f, text="Show VAT / tax row",
+                        variable=self.tax_enabled).grid(
+            row=2, column=0, columnspan=2, sticky="w", padx=6, pady=3)
+        self._field(f, "Tax label (e.g. VAT)", self.tax_label,   3)
+        self._field(f, "Tax rate %",           self.tax_rate,    4, width=10)
         ttk.Separator(f, orient="horizontal").grid(
-            row=4, column=0, columnspan=2, sticky="ew", pady=8)
-        self._field(f, "Subtotal label",       self.subtotal_label, 5)
-        self._field(f, "Total label",          self.total_label,    6)
-        self._field(f, "Amount Due label",     self.due_label,      7)
+            row=5, column=0, columnspan=2, sticky="ew", pady=8)
+        self._field(f, "Subtotal label",       self.subtotal_label, 6)
+        self._field(f, "Total label",          self.total_label,    7)
+        self._field(f, "Amount Due label",     self.due_label,      8)
 
     # ── Column management ──────────────────────────────────────────────────────
     def _get_columns(self):
@@ -314,7 +364,6 @@ class CustomerTableApp:
         RowDialog(self.root, cols, initial=current,
                   on_save=lambda vals: self.tree.item(iid, values=vals))
 
-    # ── Helpers ────────────────────────────────────────────────────────────────
     def _get_rows(self):
         return [list(self.tree.item(iid, "values"))
                 for iid in self.tree.get_children()]
@@ -325,52 +374,54 @@ class CustomerTableApp:
         except Exception:
             return ""
 
-    # ── Preview ────────────────────────────────────────────────────────────────
     def _preview(self):
-        cols = self._get_columns()
-        rows = self._get_rows()
         PreviewWindow(self.root, self._collect())
 
     def _collect(self):
         return {
-            "sup_name":    self.sup_name.get(),
-            "sup_street":  self.sup_street.get(),
-            "sup_city":    self.sup_city.get(),
-            "sup_country": self.sup_country.get(),
-            "sup_ico":     self.sup_ico.get(),
-            "sup_dic":     self.sup_dic.get(),
-            "sup_icdph":   self.sup_icdph.get(),
-            "sup_iban":    self.sup_iban.get(),
-            "sup_swift":   self.sup_swift.get(),
-            "sup_bank":    self.sup_bank.get(),
-            "sup_phone":   self.sup_phone.get(),
-            "sup_email":   self.sup_email.get(),
-            "sup_web":     self.sup_web.get(),
-            "cus_name":    self.cus_name.get(),
-            "cus_street":  self.cus_street.get(),
-            "cus_city":    self.cus_city.get(),
-            "cus_country": self.cus_country.get(),
-            "cus_ico":     self.cus_ico.get(),
-            "cus_dic":     self.cus_dic.get(),
-            "doc_title":   self.doc_title.get(),
-            "doc_number":  self.doc_number.get(),
-            "doc_issue":   self.doc_issue.get(),
-            "doc_due":     self.doc_due.get(),
-            "doc_var_sym": self.doc_var_sym.get(),
-            "doc_payment": self.doc_payment.get(),
-            "doc_currency":self.doc_currency.get(),
-            "note":        self._get_note(),
-            "columns":     self._get_columns(),
-            "rows":        self._get_rows(),
-            "tax_enabled": self.tax_enabled.get(),
-            "tax_label":   self.tax_label.get(),
-            "tax_rate":    self.tax_rate.get(),
+            "sup_name":       self.sup_name.get(),
+            "sup_street":     self.sup_street.get(),
+            "sup_city":       self.sup_city.get(),
+            "sup_country":    self.sup_country.get(),
+            "sup_ico":        self.sup_ico.get(),
+            "sup_dic":        self.sup_dic.get(),
+            "sup_icdph":      self.sup_icdph.get(),
+            "sup_iban":       self.sup_iban.get(),
+            "sup_swift":      self.sup_swift.get(),
+            "sup_bank":       self.sup_bank.get(),
+            "sup_phone":      self.sup_phone.get(),
+            "sup_email":      self.sup_email.get(),
+            "sup_web":        self.sup_web.get(),
+            "show_sup_ids":     self.show_sup_ids.get(),
+            "show_sup_banking": self.show_sup_banking.get(),
+            "show_sup_contact": self.show_sup_contact.get(),
+            "cus_name":       self.cus_name.get(),
+            "cus_street":     self.cus_street.get(),
+            "cus_city":       self.cus_city.get(),
+            "cus_country":    self.cus_country.get(),
+            "cus_ico":        self.cus_ico.get(),
+            "cus_dic":        self.cus_dic.get(),
+            "show_cus_ids":   self.show_cus_ids.get(),
+            "doc_title":      self.doc_title.get(),
+            "doc_number":     self.doc_number.get(),
+            "doc_issue":      self.doc_issue.get(),
+            "doc_due":        self.doc_due.get(),
+            "doc_var_sym":    self.doc_var_sym.get(),
+            "doc_payment":    self.doc_payment.get(),
+            "doc_currency":   self.doc_currency.get(),
+            "note":           self._get_note(),
+            "columns":        self._get_columns(),
+            "rows":           self._get_rows(),
+            "show_prices":    self.show_prices.get(),
+            "tax_enabled":    self.tax_enabled.get(),
+            "show_totals":    self.show_totals.get(),
+            "tax_label":      self.tax_label.get(),
+            "tax_rate":       self.tax_rate.get(),
             "subtotal_label": self.subtotal_label.get(),
             "total_label":    self.total_label.get(),
             "due_label":      self.due_label.get(),
         }
 
-    # ── PDF export ─────────────────────────────────────────────────────────────
     def _export_pdf(self):
         if not REPORTLAB_AVAILABLE:
             messagebox.showerror("Missing library",
@@ -441,13 +492,15 @@ class PreviewWindow(tk.Toplevel):
         lines.append("=" * W)
         lines.append("")
 
-        # Supplier | Customer
         sup = [d["sup_name"], d["sup_street"], d["sup_city"]]
-        if d["sup_ico"]:   sup.append(f"ID: {d['sup_ico']}")
-        if d["sup_dic"]:   sup.append(f"Tax: {d['sup_dic']}")
-        if d["sup_icdph"]: sup.append(f"VAT: {d['sup_icdph']}")
+        if d["show_sup_ids"]:
+            if d["sup_ico"]:   sup.append(f"ID: {d['sup_ico']}")
+            if d["sup_dic"]:   sup.append(f"Tax: {d['sup_dic']}")
+            if d["sup_icdph"]: sup.append(f"VAT: {d['sup_icdph']}")
         cus = [d["cus_name"], d["cus_street"], d["cus_city"]]
-        if d["cus_ico"]:   cus.append(f"ID: {d['cus_ico']}")
+        if d["show_cus_ids"]:
+            if d["cus_ico"]:   cus.append(f"ID: {d['cus_ico']}")
+            if d["cus_dic"]:   cus.append(f"Tax: {d['cus_dic']}")
 
         col_w = W // 2 - 2
         lines.append("SUPPLIER".ljust(col_w) + "  CUSTOMER")
@@ -457,60 +510,66 @@ class PreviewWindow(tk.Toplevel):
             lines.append(l[:col_w].ljust(col_w) + "  " + r[:col_w])
         lines.append("-" * W)
 
-        # Meta
         meta = [
-            ("Issue date", d["doc_issue"]),   ("Due date", d["doc_due"]),
-            ("Var. symbol", d["doc_var_sym"]), ("Payment", d["doc_payment"]),
-            ("IBAN", d["sup_iban"]),           ("SWIFT", d["sup_swift"]),
+            ("Issue date",    d["doc_issue"]),
+            ("Due date",      d["doc_due"]),
+            ("Var. symbol",   d["doc_var_sym"]),
+            ("Payment",       d["doc_payment"]),
         ]
+        if d["show_sup_banking"]:
+            meta += [("IBAN", d["sup_iban"]), ("SWIFT", d["sup_swift"])]
         for k, v in meta:
             if v:
                 lines.append(f"{k+':':<18} {v}")
         lines.append("-" * W)
 
-        # Note
         if d["note"]:
             lines.append(d["note"])
             lines.append("")
 
-        # Items table
         cols = d["columns"]
         if cols:
-            cw = max(10, (W - 2) // len(cols))
-            lines.append(" | ".join(c[:cw].ljust(cw) for c in cols))
-            lines.append("-" * W)
-            for row in d["rows"]:
-                lines.append(" | ".join(str(v)[:cw].ljust(cw)
-                              for v in (list(row) + [""] * len(cols))[:len(cols)]))
+            show_prices = d.get("show_prices", True)
+            display_cols = cols if show_prices else [c for c in cols
+                if c.lower() not in ("unit price", "total", "price", "amount")]
+            if display_cols:
+                cw = max(10, (W - 2) // len(display_cols))
+                lines.append(" | ".join(c[:cw].ljust(cw) for c in display_cols))
+                lines.append("-" * W)
+                col_idx = [cols.index(c) for c in display_cols]
+                for row in d["rows"]:
+                    lines.append(" | ".join(
+                        str(row[i] if i < len(row) else "")[:cw].ljust(cw)
+                        for i in col_idx))
         lines.append("=" * W)
 
-        # Totals
-        cur = d["doc_currency"]
-        try:
-            subtotal = sum(float(str(r[-1]).replace(",", ".").replace(cur, "").strip())
-                           for r in d["rows"] if r)
-        except Exception:
-            subtotal = 0.0
-        lines.append(f"{d['subtotal_label']:>40}  {cur} {subtotal:,.2f}")
-        if d["tax_enabled"]:
+        if d.get("show_totals", True):
+            cur = d["doc_currency"]
             try:
-                rate = float(d["tax_rate"])
+                subtotal = sum(float(str(r[-1]).replace(",", ".").replace(cur, "").strip())
+                               for r in d["rows"] if r)
             except Exception:
-                rate = 0
-            tax = subtotal * rate / 100
-            lines.append(f"{d['tax_label']} ({d['tax_rate']}%):".rjust(40) +
-                         f"  {cur} {tax:,.2f}")
-            total = subtotal + tax
-        else:
-            total = subtotal
-        lines.append(f"{d['total_label']:>40}  {cur} {total:,.2f}")
-        lines.append(f">>> {d['due_label']:>36}  {cur} {total:,.2f} <<<")
-        lines.append("-" * W)
+                subtotal = 0.0
+            lines.append(f"{d['subtotal_label']:>40}  {cur} {subtotal:,.2f}")
+            if d["tax_enabled"]:
+                try:
+                    rate = float(d["tax_rate"])
+                except Exception:
+                    rate = 0
+                tax = subtotal * rate / 100
+                lines.append(f"{d['tax_label']} ({d['tax_rate']}%):".rjust(40) +
+                             f"  {cur} {tax:,.2f}")
+                total = subtotal + tax
+            else:
+                total = subtotal
+            lines.append(f"{d['total_label']:>40}  {cur} {total:,.2f}")
+            lines.append(f">>> {d['due_label']:>36}  {cur} {total:,.2f} <<<")
+            lines.append("-" * W)
 
-        # Footer
-        footer = " | ".join(x for x in [d["sup_phone"], d["sup_email"], d["sup_web"]] if x)
-        if footer:
-            lines.append(footer.center(W))
+        if d["show_sup_contact"]:
+            footer = " | ".join(x for x in [d["sup_phone"], d["sup_email"], d["sup_web"]] if x)
+            if footer:
+                lines.append(footer.center(W))
 
         txt.insert("1.0", "\n".join(lines))
         txt.config(state="disabled")
@@ -523,34 +582,33 @@ def generate_pdf(path, d):
                             topMargin=15*mm, bottomMargin=15*mm)
     styles = getSampleStyleSheet()
     story  = []
-    W = A4[0] - 36*mm   # usable width
+    W = A4[0] - 36*mm
     cur = d["doc_currency"]
 
-    # ── Styles ─────────────────────────────────────────────────────────────
     def ps(name, **kw):
         base = kw.pop("parent", "Normal")
         return ParagraphStyle(name, parent=styles[base], **kw)
 
-    sTitle   = ps("DocTitle",  fontSize=26, textColor=C_ACCENT,
-                   fontName="Helvetica-Bold", alignment=TA_RIGHT, spaceAfter=0)
-    sSupLbl  = ps("SupLbl",    fontSize=7,  textColor=C_ACCENT,
-                   fontName="Helvetica-Bold", spaceBefore=0, spaceAfter=1)
-    sSupVal  = ps("SupVal",    fontSize=9,  textColor=C_DARK, fontName="Helvetica-Bold")
-    sSmall   = ps("Small",     fontSize=8,  textColor=C_DARK)
-    sMeta    = ps("Meta",      fontSize=8.5, textColor=C_DARK, fontName="Helvetica-Bold")
-    sMetaV   = ps("MetaV",     fontSize=8.5, textColor=C_DARK)
-    sNote    = ps("Note",      fontSize=9,  textColor=C_DARK, spaceBefore=4, spaceAfter=4)
-    sFooter  = ps("Footer",    fontSize=7.5, textColor=colors.HexColor("#8899aa"),
-                   alignment=TA_CENTER)
-    sTotLbl  = ps("TotLbl",    fontSize=9,  textColor=C_DARK,
-                   fontName="Helvetica-Bold", alignment=TA_RIGHT)
-    sTotVal  = ps("TotVal",    fontSize=9,  textColor=C_DARK, alignment=TA_RIGHT)
-    sDueLbl  = ps("DueLbl",    fontSize=11, textColor=colors.white,
-                   fontName="Helvetica-Bold", alignment=TA_RIGHT)
-    sDueVal  = ps("DueVal",    fontSize=11, textColor=colors.white,
-                   fontName="Helvetica-Bold", alignment=TA_RIGHT)
+    sTitle  = ps("DocTitle",  fontSize=26, textColor=C_ACCENT,
+                  fontName="Helvetica-Bold", alignment=TA_RIGHT, spaceAfter=0)
+    sSupLbl = ps("SupLbl",   fontSize=7,  textColor=C_ACCENT,
+                  fontName="Helvetica-Bold", spaceBefore=0, spaceAfter=1)
+    sSupVal = ps("SupVal",   fontSize=9,  textColor=C_DARK, fontName="Helvetica-Bold")
+    sSmall  = ps("Small",    fontSize=8,  textColor=C_DARK)
+    sMeta   = ps("Meta",     fontSize=8.5, textColor=C_DARK, fontName="Helvetica-Bold")
+    sMetaV  = ps("MetaV",    fontSize=8.5, textColor=C_DARK)
+    sNote   = ps("Note",     fontSize=9,  textColor=C_DARK, spaceBefore=4, spaceAfter=4)
+    sFooter = ps("Footer",   fontSize=7.5, textColor=colors.HexColor("#8899aa"),
+                  alignment=TA_CENTER)
+    sTotLbl = ps("TotLbl",   fontSize=9,  textColor=C_DARK,
+                  fontName="Helvetica-Bold", alignment=TA_RIGHT)
+    sTotVal = ps("TotVal",   fontSize=9,  textColor=C_DARK, alignment=TA_RIGHT)
+    sDueLbl = ps("DueLbl",   fontSize=11, textColor=colors.white,
+                  fontName="Helvetica-Bold", alignment=TA_RIGHT)
+    sDueVal = ps("DueVal",   fontSize=11, textColor=colors.white,
+                  fontName="Helvetica-Bold", alignment=TA_RIGHT)
 
-    # ── Header: title right, number below ─────────────────────────────────
+    # Header
     story.append(Table(
         [[Paragraph(d["doc_title"], sTitle)]],
         colWidths=[W],
@@ -560,29 +618,30 @@ def generate_pdf(path, d):
     story.append(Paragraph(
         f"<font size=9 color='#8899aa'>No. {d['doc_number']}</font>",
         ps("DocNum", alignment=TA_RIGHT, spaceAfter=6)))
-    story.append(HRFlowable(width="100%", thickness=2,
-                             color=C_ACCENT, spaceAfter=6))
+    story.append(HRFlowable(width="100%", thickness=2, color=C_ACCENT, spaceAfter=6))
 
-    # ── Supplier / Customer block ──────────────────────────────────────────
+    # Supplier / Customer
     def sup_lines():
-        items = []
-        items.append(Paragraph("SUPPLIER", sSupLbl))
-        items.append(Paragraph(d["sup_name"], sSupVal))
+        items = [Paragraph("SUPPLIER", sSupLbl), Paragraph(d["sup_name"], sSupVal)]
         for v in [d["sup_street"], d["sup_city"], d["sup_country"]]:
             if v: items.append(Paragraph(v, sSmall))
-        for lbl, val in [("ID", d["sup_ico"]), ("Tax ID", d["sup_dic"]),
-                          ("VAT ID", d["sup_icdph"])]:
-            if val: items.append(Paragraph(f"{lbl}: {val}", sSmall))
+        if d["show_sup_ids"]:
+            for lbl, val in [("ID", d["sup_ico"]), ("Tax ID", d["sup_dic"]),
+                              ("VAT ID", d["sup_icdph"])]:
+                if val: items.append(Paragraph(f"{lbl}: {val}", sSmall))
+        if d["show_sup_banking"]:
+            for lbl, val in [("IBAN", d["sup_iban"]), ("SWIFT", d["sup_swift"]),
+                              ("Bank", d["sup_bank"])]:
+                if val: items.append(Paragraph(f"{lbl}: {val}", sSmall))
         return items
 
     def cus_lines():
-        items = []
-        items.append(Paragraph("CUSTOMER", sSupLbl))
-        items.append(Paragraph(d["cus_name"], sSupVal))
+        items = [Paragraph("CUSTOMER", sSupLbl), Paragraph(d["cus_name"], sSupVal)]
         for v in [d["cus_street"], d["cus_city"], d["cus_country"]]:
             if v: items.append(Paragraph(v, sSmall))
-        for lbl, val in [("ID", d["cus_ico"]), ("Tax ID", d["cus_dic"])]:
-            if val: items.append(Paragraph(f"{lbl}: {val}", sSmall))
+        if d["show_cus_ids"]:
+            for lbl, val in [("ID", d["cus_ico"]), ("Tax ID", d["cus_dic"])]:
+                if val: items.append(Paragraph(f"{lbl}: {val}", sSmall))
         return items
 
     addr_table = Table(
@@ -602,17 +661,25 @@ def generate_pdf(path, d):
     story.append(addr_table)
     story.append(Spacer(1, 5*mm))
 
-    # ── Payment meta grid ──────────────────────────────────────────────────
+    # Payment meta grid
     meta_pairs = [
-        ("Issue date",    d["doc_issue"]),
+        ("Issue date",      d["doc_issue"]),
         ("Variable symbol", d["doc_var_sym"]),
-        ("Due date",      d["doc_due"]),
-        ("Payment method", d["doc_payment"]),
-        ("IBAN",          d["sup_iban"]),
-        ("SWIFT / BIC",   d["sup_swift"]),
-        ("Bank",          d["sup_bank"]),
-        ("", ""),
+        ("Due date",        d["doc_due"]),
+        ("Payment method",  d["doc_payment"]),
     ]
+    if d["show_sup_banking"]:
+        meta_pairs += [
+            ("IBAN",        d["sup_iban"]),
+            ("SWIFT / BIC", d["sup_swift"]),
+            ("Bank",        d["sup_bank"]),
+            ("", ""),
+        ]
+
+    # Pad to even number of pairs
+    if len(meta_pairs) % 2 != 0:
+        meta_pairs.append(("", ""))
+
     meta_data = []
     for i in range(0, len(meta_pairs), 2):
         row = []
@@ -621,111 +688,112 @@ def generate_pdf(path, d):
                 row += [Paragraph(k, sMeta), Paragraph(v or "", sMetaV)]
             else:
                 row += [Paragraph("", sSmall), Paragraph("", sSmall)]
-        while len(row) < 4:
-            row += [Paragraph("", sSmall), Paragraph("", sSmall)]
         meta_data.append(row)
 
-    meta_table = Table(meta_data,
-                       colWidths=[W*0.18, W*0.32, W*0.18, W*0.32],
-                       style=TableStyle([
-                           ("ROWBACKGROUNDS", (0,0), (-1,-1),
-                            [C_LIGHT_BG, colors.white]),
-                           ("GRID",          (0,0), (-1,-1), 0.3, C_BORDER),
-                           ("LEFTPADDING",   (0,0), (-1,-1), 6),
-                           ("RIGHTPADDING",  (0,0), (-1,-1), 6),
-                           ("TOPPADDING",    (0,0), (-1,-1), 4),
-                           ("BOTTOMPADDING", (0,0), (-1,-1), 4),
-                       ]))
-    story.append(meta_table)
-    story.append(Spacer(1, 5*mm))
+    if meta_data:
+        meta_table = Table(meta_data,
+                           colWidths=[W*0.18, W*0.32, W*0.18, W*0.32],
+                           style=TableStyle([
+                               ("ROWBACKGROUNDS", (0,0), (-1,-1), [C_LIGHT_BG, colors.white]),
+                               ("GRID",           (0,0), (-1,-1), 0.3, C_BORDER),
+                               ("LEFTPADDING",    (0,0), (-1,-1), 6),
+                               ("RIGHTPADDING",   (0,0), (-1,-1), 6),
+                               ("TOPPADDING",     (0,0), (-1,-1), 4),
+                               ("BOTTOMPADDING",  (0,0), (-1,-1), 4),
+                           ]))
+        story.append(meta_table)
+        story.append(Spacer(1, 5*mm))
 
-    # ── Note ──────────────────────────────────────────────────────────────
+    # Note
     if d["note"]:
         story.append(Paragraph(d["note"], sNote))
         story.append(Spacer(1, 3*mm))
 
-    # ── Items table ────────────────────────────────────────────────────────
+    # Items table
     cols = d["columns"]
-    if cols:
-        cw = W / len(cols)
+    show_prices = d.get("show_prices", True)
+    if not show_prices:
+        price_keywords = {"unit price", "total", "price", "amount"}
+        display_cols = [c for c in cols if c.lower() not in price_keywords]
+    else:
+        display_cols = cols
+
+    if display_cols:
+        cw = W / len(display_cols)
+        col_idx = [cols.index(c) for c in display_cols]
         items_data = [[Paragraph(c, ps("IH", fontSize=9, textColor=colors.white,
-                                        fontName="Helvetica-Bold",
-                                        alignment=TA_CENTER))
-                       for c in cols]]
+                                        fontName="Helvetica-Bold", alignment=TA_CENTER))
+                       for c in display_cols]]
         for row in d["rows"]:
             padded = (list(row) + [""] * len(cols))[:len(cols)]
-            items_data.append([Paragraph(str(v), ps("IV", fontSize=9,
-                                                      textColor=C_DARK,
-                                                      alignment=TA_CENTER))
-                                for v in padded])
+            items_data.append([Paragraph(str(padded[i]), ps("IV", fontSize=9,
+                                                             textColor=C_DARK,
+                                                             alignment=TA_CENTER))
+                                for i in col_idx])
 
-        items_table = Table(items_data, colWidths=[cw]*len(cols), repeatRows=1,
+        items_table = Table(items_data, colWidths=[cw]*len(display_cols), repeatRows=1,
                             style=TableStyle([
-                                ("BACKGROUND",    (0,0), (-1,0),   C_ACCENT),
-                                ("ROWBACKGROUNDS",(0,1), (-1,-1),
-                                 [colors.white, C_LIGHT_BG]),
-                                ("GRID",          (0,0), (-1,-1),  0.4, C_BORDER),
-                                ("TOPPADDING",    (0,0), (-1,-1),  5),
-                                ("BOTTOMPADDING", (0,0), (-1,-1),  5),
-                                ("LEFTPADDING",   (0,0), (-1,-1),  6),
-                                ("RIGHTPADDING",  (0,0), (-1,-1),  6),
+                                ("BACKGROUND",    (0,0), (-1,0),  C_ACCENT),
+                                ("ROWBACKGROUNDS",(0,1), (-1,-1), [colors.white, C_LIGHT_BG]),
+                                ("GRID",          (0,0), (-1,-1), 0.4, C_BORDER),
+                                ("TOPPADDING",    (0,0), (-1,-1), 5),
+                                ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+                                ("LEFTPADDING",   (0,0), (-1,-1), 6),
+                                ("RIGHTPADDING",  (0,0), (-1,-1), 6),
                             ]))
         story.append(items_table)
         story.append(Spacer(1, 4*mm))
 
-    # ── Totals ────────────────────────────────────────────────────────────
-    try:
-        subtotal = sum(float(str(r[-1]).replace(",", ".").replace(cur, "").strip())
-                       for r in d["rows"] if r)
-    except Exception:
-        subtotal = 0.0
-
-    tot_rows = []
-    tot_rows.append([Paragraph(d["subtotal_label"], sTotLbl),
-                     Paragraph(f"{cur} {subtotal:,.2f}", sTotVal)])
-    if d["tax_enabled"]:
+    # Totals
+    if d.get("show_totals", True) and show_prices:
         try:
-            rate = float(d["tax_rate"])
+            subtotal = sum(float(str(r[-1]).replace(",", ".").replace(cur, "").strip())
+                           for r in d["rows"] if r)
         except Exception:
-            rate = 0
-        tax   = subtotal * rate / 100
-        total = subtotal + tax
-        tot_rows.append([Paragraph(f"{d['tax_label']} ({d['tax_rate']}%)", sTotLbl),
-                         Paragraph(f"{cur} {tax:,.2f}", sTotVal)])
-    else:
-        total = subtotal
+            subtotal = 0.0
 
-    tot_rows.append([Paragraph(d["total_label"], sTotLbl),
-                     Paragraph(f"{cur} {total:,.2f}", sTotVal)])
+        tot_rows = []
+        tot_rows.append([Paragraph(d["subtotal_label"], sTotLbl),
+                         Paragraph(f"{cur} {subtotal:,.2f}", sTotVal)])
+        if d["tax_enabled"]:
+            try:
+                rate = float(d["tax_rate"])
+            except Exception:
+                rate = 0
+            tax   = subtotal * rate / 100
+            total = subtotal + tax
+            tot_rows.append([Paragraph(f"{d['tax_label']} ({d['tax_rate']}%)", sTotLbl),
+                             Paragraph(f"{cur} {tax:,.2f}", sTotVal)])
+        else:
+            total = subtotal
 
-    # Amount due row (highlighted)
-    tot_rows.append([Paragraph(d["due_label"], sDueLbl),
-                     Paragraph(f"{cur} {total:,.2f}", sDueVal)])
+        tot_rows.append([Paragraph(d["total_label"], sTotLbl),
+                         Paragraph(f"{cur} {total:,.2f}", sTotVal)])
+        tot_rows.append([Paragraph(d["due_label"], sDueLbl),
+                         Paragraph(f"{cur} {total:,.2f}", sDueVal)])
 
-    n = len(tot_rows)
-    tot_style = TableStyle([
-        ("ALIGN",        (0,0), (-1,-1),   "RIGHT"),
-        ("GRID",         (0,0), (-1,-2),   0.3, C_BORDER),
-        ("LINEBELOW",    (0,-2),(1,-2),     0.8, C_ACCENT),
-        ("BACKGROUND",   (0,-1),(1,-1),    C_ACCENT),
-        ("TOPPADDING",   (0,0), (-1,-1),   4),
-        ("BOTTOMPADDING",(0,0), (-1,-1),   4),
-        ("LEFTPADDING",  (0,0), (-1,-1),   8),
-        ("RIGHTPADDING", (0,0), (-1,-1),   8),
-    ])
-    tot_table = Table(tot_rows, colWidths=[W*0.65, W*0.35], style=tot_style)
+        tot_style = TableStyle([
+            ("ALIGN",        (0,0), (-1,-1),  "RIGHT"),
+            ("GRID",         (0,0), (-1,-2),  0.3, C_BORDER),
+            ("LINEBELOW",    (0,-2),(1,-2),    0.8, C_ACCENT),
+            ("BACKGROUND",   (0,-1),(1,-1),   C_ACCENT),
+            ("TOPPADDING",   (0,0), (-1,-1),  4),
+            ("BOTTOMPADDING",(0,0), (-1,-1),  4),
+            ("LEFTPADDING",  (0,0), (-1,-1),  8),
+            ("RIGHTPADDING", (0,0), (-1,-1),  8),
+        ])
+        tot_table = Table(tot_rows, colWidths=[W*0.65, W*0.35], style=tot_style)
+        story.append(Table([[tot_table]], colWidths=[W],
+                            style=TableStyle([("ALIGN", (0,0), (-1,-1), "RIGHT")])))
 
-    # Right-align the totals block
-    story.append(Table([[tot_table]], colWidths=[W],
-                        style=TableStyle([("ALIGN", (0,0), (-1,-1), "RIGHT")])))
-
-    # ── Footer ────────────────────────────────────────────────────────────
-    footer_parts = [x for x in [d["sup_phone"], d["sup_email"], d["sup_web"]] if x]
-    if footer_parts:
-        story.append(Spacer(1, 8*mm))
-        story.append(HRFlowable(width="100%", thickness=0.5,
-                                 color=C_BORDER, spaceAfter=4))
-        story.append(Paragraph(" | ".join(footer_parts), sFooter))
+    # Footer
+    if d["show_sup_contact"]:
+        footer_parts = [x for x in [d["sup_phone"], d["sup_email"], d["sup_web"]] if x]
+        if footer_parts:
+            story.append(Spacer(1, 8*mm))
+            story.append(HRFlowable(width="100%", thickness=0.5,
+                                     color=C_BORDER, spaceAfter=4))
+            story.append(Paragraph(" | ".join(footer_parts), sFooter))
 
     doc.build(story)
 
