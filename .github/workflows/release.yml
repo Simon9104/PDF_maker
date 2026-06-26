@@ -7,17 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v1.0.1)'
+        description: 'Release tag (e.g. v1.0.0)'
         required: true
-        default: 'v1.0.1'
+        default: 'v1.0.0'
 
 permissions:
   contents: write
 
 jobs:
   build-macos:
-    name: Build macOS (Intel x86_64)
-    runs-on: macos-13
+    name: Build macOS
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -34,16 +34,25 @@ jobs:
 
       - name: Create DMG
         run: |
+          brew install create-dmg || true
+          create-dmg \
+            --volname "CustomerTableGenerator" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --app-drop-link 450 185 \
+            "CustomerTableGenerator-macOS.dmg" \
+            "dist/CustomerTableGenerator.app" || \
           hdiutil create -volname "CustomerTableGenerator" \
             -srcfolder dist/CustomerTableGenerator.app \
             -ov -format UDZO \
-            CustomerTableGenerator-macOS-Intel.dmg
+            CustomerTableGenerator-macOS.dmg
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
-          path: CustomerTableGenerator-macOS-Intel.dmg
+          path: CustomerTableGenerator-macOS.dmg
 
   build-windows:
     name: Build Windows
@@ -95,8 +104,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -d ${{ steps.tag.outputs.name }} 2>/dev/null || true
-          git push origin :refs/tags/${{ steps.tag.outputs.name }} 2>/dev/null || true
           git tag ${{ steps.tag.outputs.name }}
           git push origin ${{ steps.tag.outputs.name }}
 
@@ -129,21 +136,19 @@ jobs:
             ### Downloads
             | Platform | File |
             |----------|------|
-            | macOS — Intel (x86_64) | `CustomerTableGenerator-macOS-Intel.dmg` |
+            | macOS | `CustomerTableGenerator-macOS.dmg` |
             | Windows | `CustomerTableGenerator-Windows.zip` (extract and run the `.exe`) |
-
-            > **Apple Silicon (M1/M2/M3/M4) users:** run from source with `pip install reportlab && python app.py`
 
             ### macOS install
             1. Open the `.dmg`
             2. Drag **CustomerTableGenerator** to Applications
-            3. Right-click → Open on first launch (Gatekeeper warning is normal)
+            3. Right-click → Open on first launch (Gatekeeper)
 
             ### Windows install
             1. Extract the `.zip`
             2. Double-click `CustomerTableGenerator.exe`
           files: |
-            CustomerTableGenerator-macOS-Intel.dmg
+            CustomerTableGenerator-macOS.dmg
             CustomerTableGenerator-Windows.zip
           draft: false
           prerelease: false
