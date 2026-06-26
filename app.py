@@ -1,8 +1,7 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
-import os, sys, random, string, json
+from tkinter import ttk, messagebox, filedialog
+import os, sys, random, string
 from datetime import date
-from pathlib import Path
 
 try:
     from reportlab.lib.pagesizes import A4
@@ -22,22 +21,6 @@ C_LIGHT_BG = colors.HexColor("#f0f4f8")
 C_TOTAL_BG = colors.HexColor("#1a5fa8")
 C_BORDER   = colors.HexColor("#c8d6e5")
 
-DATA_DIR = Path.home() / ".invoice_generator"
-COMPANY_FILE   = DATA_DIR / "company.json"
-CUSTOMERS_FILE = DATA_DIR / "customers.json"
-
-def _ensure_data_dir():
-    DATA_DIR.mkdir(exist_ok=True)
-
-def _load_json(path):
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-def _save_json(path, data):
-    _ensure_data_dir()
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def _generate_doc_number():
     today = date.today()
@@ -53,8 +36,6 @@ class CustomerTableApp:
         self.root.minsize(900, 600)
         self._setup_style()
         self._build_ui()
-        self._load_company_on_start()
-        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _setup_style(self):
         s = ttk.Style()
@@ -62,11 +43,10 @@ class CustomerTableApp:
             s.theme_use("clam")
         except Exception:
             pass
-        s.configure("H.TLabel",      font=("Helvetica", 12, "bold"), foreground="#1a5fa8")
-        s.configure("Sec.TLabel",    font=("Helvetica", 10, "bold"), foreground="#1c2b3a")
+        s.configure("H.TLabel",  font=("Helvetica", 12, "bold"), foreground="#1a5fa8")
+        s.configure("Sec.TLabel", font=("Helvetica", 10, "bold"), foreground="#1c2b3a")
         s.configure("Primary.TButton", font=("Helvetica", 10, "bold"), padding=7)
         s.configure("Action.TButton",  font=("Helvetica", 10), padding=6)
-        s.configure("Save.TButton",    font=("Helvetica", 9), padding=4)
 
     def _build_ui(self):
         bar = ttk.Frame(self.root, padding=(10, 6))
@@ -92,34 +72,16 @@ class CustomerTableApp:
         return e
 
     def _tab_supplier(self, nb):
-        outer = ttk.Frame(nb, padding=16)
-        nb.add(outer, text="  Supplier  ")
-
-        bar = ttk.Frame(outer)
-        bar.pack(fill="x", pady=(0, 8))
-        ttk.Label(bar, text="Company Profile:", font=("Helvetica", 9, "bold")).pack(side="left", padx=(0, 6))
-        ttk.Button(bar, text="Save Company", style="Save.TButton",
-                   command=self._save_company).pack(side="left", padx=2)
-        ttk.Button(bar, text="Load Company", style="Save.TButton",
-                   command=self._load_company).pack(side="left", padx=2)
-        self.company_status = tk.StringVar(value="")
-        ttk.Label(bar, textvariable=self.company_status,
-                  font=("Helvetica", 8), foreground="#1a5fa8").pack(side="left", padx=8)
-
-        ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=(0, 8))
-
-        f = ttk.Frame(outer)
-        f.pack(fill="both", expand=True)
+        f = ttk.Frame(nb, padding=16)
+        nb.add(f, text="  Supplier  ")
         f.columnconfigure(1, weight=1)
         f.columnconfigure(3, weight=1)
-
         ttk.Label(f, text="Supplier / Your Company", style="Sec.TLabel").grid(
-            row=0, column=0, columnspan=4, sticky="w", pady=(0, 8))
-
+            row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
         self.sup_name    = tk.StringVar(value="Your Company s.r.o.")
         self.sup_street  = tk.StringVar(value="Main Street 1")
         self.sup_city    = tk.StringVar(value="10000 City")
-        self.sup_country = tk.StringVar()
+        self.sup_country = tk.StringVar(value="")
         self.sup_ico     = tk.StringVar()
         self.sup_dic     = tk.StringVar()
         self.sup_icdph   = tk.StringVar()
@@ -132,62 +94,35 @@ class CustomerTableApp:
         self.show_sup_ids     = tk.BooleanVar(value=True)
         self.show_sup_banking = tk.BooleanVar(value=True)
         self.show_sup_contact = tk.BooleanVar(value=True)
-
-        self._field(f, "Company name",  self.sup_name,    1)
-        self._field(f, "Street",        self.sup_street,  2)
-        self._field(f, "City / ZIP",    self.sup_city,    3)
-        self._field(f, "Country",       self.sup_country, 4)
-        ttk.Separator(f, orient="horizontal").grid(row=5, column=0, columnspan=4, sticky="ew", pady=6)
+        self._field(f, "Company name",  self.sup_name,    1, 0)
+        self._field(f, "Street",        self.sup_street,  2, 0)
+        self._field(f, "City / ZIP",    self.sup_city,    3, 0)
+        self._field(f, "Country",       self.sup_country, 4, 0)
+        ttk.Separator(f, orient="horizontal").grid(row=5, column=0, columnspan=4, sticky="ew", pady=8)
         ttk.Checkbutton(f, text="Include registration IDs (ICO / DIC / VAT)",
                         variable=self.show_sup_ids).grid(row=6, column=0, columnspan=4, sticky="w", padx=6)
-        self._field(f, "ID / ICO",        self.sup_ico,   7)
-        self._field(f, "Tax ID / DIC",    self.sup_dic,   8)
-        self._field(f, "VAT ID / IC DPH", self.sup_icdph, 9)
-        ttk.Separator(f, orient="horizontal").grid(row=10, column=0, columnspan=4, sticky="ew", pady=6)
+        self._field(f, "ID / ICO",        self.sup_ico,    7, 0)
+        self._field(f, "Tax ID / DIC",    self.sup_dic,    8, 0)
+        self._field(f, "VAT ID / IC DPH", self.sup_icdph,  9, 0)
+        ttk.Separator(f, orient="horizontal").grid(row=10, column=0, columnspan=4, sticky="ew", pady=8)
         ttk.Checkbutton(f, text="Include banking details (IBAN / SWIFT)",
                         variable=self.show_sup_banking).grid(row=11, column=0, columnspan=4, sticky="w", padx=6)
-        self._field(f, "IBAN",        self.sup_iban,  12, width=40)
-        self._field(f, "SWIFT / BIC", self.sup_swift, 13)
-        self._field(f, "Bank",        self.sup_bank,  14)
-        ttk.Separator(f, orient="horizontal").grid(row=15, column=0, columnspan=4, sticky="ew", pady=6)
+        self._field(f, "IBAN",        self.sup_iban,  12, 0, width=40)
+        self._field(f, "SWIFT / BIC", self.sup_swift, 13, 0)
+        self._field(f, "Bank",        self.sup_bank,  14, 0)
+        ttk.Separator(f, orient="horizontal").grid(row=15, column=0, columnspan=4, sticky="ew", pady=8)
         ttk.Checkbutton(f, text="Include contact info (phone / email / web)",
                         variable=self.show_sup_contact).grid(row=16, column=0, columnspan=4, sticky="w", padx=6)
-        self._field(f, "Phone",   self.sup_phone, 17)
-        self._field(f, "E-mail",  self.sup_email, 18)
-        self._field(f, "Website", self.sup_web,   19)
+        self._field(f, "Phone",   self.sup_phone, 17, 0)
+        self._field(f, "E-mail",  self.sup_email, 18, 0)
+        self._field(f, "Website", self.sup_web,   19, 0)
 
     def _tab_customer(self, nb):
-        outer = ttk.Frame(nb, padding=16)
-        nb.add(outer, text="  Customer  ")
-
-        bar = ttk.Frame(outer)
-        bar.pack(fill="x", pady=(0, 8))
-        ttk.Label(bar, text="Address Book:", font=("Helvetica", 9, "bold")).pack(side="left", padx=(0, 6))
-
-        self.customer_names = tk.StringVar()
-        self.customer_combo = ttk.Combobox(bar, textvariable=self.customer_names,
-                                            width=24, state="readonly")
-        self.customer_combo.pack(side="left", padx=2)
-        self.customer_combo.bind("<<ComboboxSelected>>", self._load_selected_customer)
-
-        ttk.Button(bar, text="Load", style="Save.TButton",
-                   command=self._load_selected_customer).pack(side="left", padx=2)
-        ttk.Button(bar, text="Save Customer", style="Save.TButton",
-                   command=self._save_customer).pack(side="left", padx=2)
-        ttk.Button(bar, text="Delete", style="Save.TButton",
-                   command=self._delete_customer).pack(side="left", padx=2)
-        ttk.Button(bar, text="New / Clear", style="Save.TButton",
-                   command=self._clear_customer).pack(side="left", padx=4)
-
-        ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=(0, 8))
-
-        f = ttk.Frame(outer)
-        f.pack(fill="both", expand=True)
+        f = ttk.Frame(nb, padding=16)
+        nb.add(f, text="  Customer  ")
         f.columnconfigure(1, weight=1)
-
         ttk.Label(f, text="Customer / Recipient", style="Sec.TLabel").grid(
-            row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
-
+            row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
         self.cus_name    = tk.StringVar(value="Customer Company Ltd.")
         self.cus_street  = tk.StringVar()
         self.cus_city    = tk.StringVar()
@@ -195,18 +130,15 @@ class CustomerTableApp:
         self.cus_ico     = tk.StringVar()
         self.cus_dic     = tk.StringVar()
         self.show_cus_ids = tk.BooleanVar(value=True)
-
-        self._field(f, "Company / Name", self.cus_name,    1)
-        self._field(f, "Street",         self.cus_street,  2)
-        self._field(f, "City / ZIP",     self.cus_city,    3)
-        self._field(f, "Country",        self.cus_country, 4)
-        ttk.Separator(f, orient="horizontal").grid(row=5, column=0, columnspan=2, sticky="ew", pady=6)
+        self._field(f, "Company / Name", self.cus_name,    1, 0)
+        self._field(f, "Street",         self.cus_street,  2, 0)
+        self._field(f, "City / ZIP",     self.cus_city,    3, 0)
+        self._field(f, "Country",        self.cus_country, 4, 0)
+        ttk.Separator(f, orient="horizontal").grid(row=5, column=0, columnspan=2, sticky="ew", pady=8)
         ttk.Checkbutton(f, text="Include billing IDs (ICO / DIC)",
                         variable=self.show_cus_ids).grid(row=6, column=0, columnspan=2, sticky="w", padx=6)
-        self._field(f, "ID / ICO",     self.cus_ico, 7)
-        self._field(f, "Tax ID / DIC", self.cus_dic, 8)
-
-        self._refresh_customer_combo()
+        self._field(f, "ID / ICO",     self.cus_ico, 7, 0)
+        self._field(f, "Tax ID / DIC", self.cus_dic, 8, 0)
 
     def _tab_meta(self, nb):
         f = ttk.Frame(nb, padding=16)
@@ -223,6 +155,7 @@ class CustomerTableApp:
         self.doc_var_sym  = tk.StringVar(value=self.doc_number.get())
         self.doc_payment  = tk.StringVar(value="Bank transfer")
         self.doc_currency = tk.StringVar(value="EUR")
+        self.doc_note     = tk.StringVar(value="")
         ttk.Label(f, text="Document title").grid(row=1, column=0, sticky="w", padx=6, pady=3)
         ttk.Entry(f, textvariable=self.doc_title, width=30).grid(row=1, column=1, sticky="ew", padx=6, pady=3)
         ttk.Label(f, text="Document number").grid(row=2, column=0, sticky="w", padx=6, pady=3)
@@ -307,139 +240,6 @@ class CustomerTableApp:
         self._field(f, "Subtotal label",   self.subtotal_label, 6)
         self._field(f, "Total label",      self.total_label,    7)
         self._field(f, "Amount Due label", self.due_label,      8)
-
-    def _company_data(self):
-        return {
-            "name": self.sup_name.get(), "street": self.sup_street.get(),
-            "city": self.sup_city.get(), "country": self.sup_country.get(),
-            "ico": self.sup_ico.get(), "dic": self.sup_dic.get(),
-            "icdph": self.sup_icdph.get(), "iban": self.sup_iban.get(),
-            "swift": self.sup_swift.get(), "bank": self.sup_bank.get(),
-            "phone": self.sup_phone.get(), "email": self.sup_email.get(),
-            "web": self.sup_web.get(),
-            "show_ids": self.show_sup_ids.get(),
-            "show_banking": self.show_sup_banking.get(),
-            "show_contact": self.show_sup_contact.get(),
-        }
-
-    def _apply_company_data(self, d):
-        self.sup_name.set(d.get("name", ""))
-        self.sup_street.set(d.get("street", ""))
-        self.sup_city.set(d.get("city", ""))
-        self.sup_country.set(d.get("country", ""))
-        self.sup_ico.set(d.get("ico", ""))
-        self.sup_dic.set(d.get("dic", ""))
-        self.sup_icdph.set(d.get("icdph", ""))
-        self.sup_iban.set(d.get("iban", ""))
-        self.sup_swift.set(d.get("swift", ""))
-        self.sup_bank.set(d.get("bank", ""))
-        self.sup_phone.set(d.get("phone", ""))
-        self.sup_email.set(d.get("email", ""))
-        self.sup_web.set(d.get("web", ""))
-        self.show_sup_ids.set(d.get("show_ids", True))
-        self.show_sup_banking.set(d.get("show_banking", True))
-        self.show_sup_contact.set(d.get("show_contact", True))
-
-    def _save_company(self):
-        _save_json(COMPANY_FILE, self._company_data())
-        self.company_status.set("Saved!")
-        self.root.after(2000, lambda: self.company_status.set(""))
-
-    def _load_company(self):
-        d = _load_json(COMPANY_FILE)
-        if d:
-            self._apply_company_data(d)
-            self.company_status.set("Loaded!")
-            self.root.after(2000, lambda: self.company_status.set(""))
-        else:
-            messagebox.showinfo("No saved company", "No company profile found. Fill in the fields and click Save Company.")
-
-    def _load_company_on_start(self):
-        d = _load_json(COMPANY_FILE)
-        if d:
-            self._apply_company_data(d)
-            self.company_status.set("Auto-loaded")
-            self.root.after(3000, lambda: self.company_status.set(""))
-
-    def _on_close(self):
-        _save_json(COMPANY_FILE, self._company_data())
-        self.root.destroy()
-
-    def _load_customers_db(self):
-        return _load_json(CUSTOMERS_FILE) if CUSTOMERS_FILE.exists() else {}
-
-    def _save_customers_db(self, db):
-        _save_json(CUSTOMERS_FILE, db)
-
-    def _refresh_customer_combo(self):
-        db = self._load_customers_db()
-        names = sorted(db.keys())
-        self.customer_combo["values"] = names
-
-    def _customer_data(self):
-        return {
-            "name": self.cus_name.get(), "street": self.cus_street.get(),
-            "city": self.cus_city.get(), "country": self.cus_country.get(),
-            "ico": self.cus_ico.get(), "dic": self.cus_dic.get(),
-            "show_ids": self.show_cus_ids.get(),
-        }
-
-    def _apply_customer_data(self, d):
-        self.cus_name.set(d.get("name", ""))
-        self.cus_street.set(d.get("street", ""))
-        self.cus_city.set(d.get("city", ""))
-        self.cus_country.set(d.get("country", ""))
-        self.cus_ico.set(d.get("ico", ""))
-        self.cus_dic.set(d.get("dic", ""))
-        self.show_cus_ids.set(d.get("show_ids", True))
-
-    def _save_customer(self):
-        name = self.cus_name.get().strip()
-        if not name:
-            messagebox.showwarning("No name", "Enter a company / customer name first.")
-            return
-        db = self._load_customers_db()
-        key = simpledialog.askstring("Save Customer",
-                                     "Save as name in address book:",
-                                     initialvalue=name,
-                                     parent=self.root)
-        if not key:
-            return
-        db[key] = self._customer_data()
-        self._save_customers_db(db)
-        self._refresh_customer_combo()
-        self.customer_names.set(key)
-        messagebox.showinfo("Saved", f'Customer "{key}" saved.')
-
-    def _load_selected_customer(self, _event=None):
-        key = self.customer_names.get()
-        if not key:
-            return
-        db = self._load_customers_db()
-        if key in db:
-            self._apply_customer_data(db[key])
-
-    def _delete_customer(self):
-        key = self.customer_names.get()
-        if not key:
-            return
-        if not messagebox.askyesno("Delete", f'Delete "{key}" from address book?'):
-            return
-        db = self._load_customers_db()
-        db.pop(key, None)
-        self._save_customers_db(db)
-        self._refresh_customer_combo()
-        self.customer_names.set("")
-
-    def _clear_customer(self):
-        self.customer_names.set("")
-        self.cus_name.set("")
-        self.cus_street.set("")
-        self.cus_city.set("")
-        self.cus_country.set("")
-        self.cus_ico.set("")
-        self.cus_dic.set("")
-        self.show_cus_ids.set(True)
 
     def _get_columns(self):
         return list(self.col_listbox.get(0, "end"))
@@ -786,8 +586,11 @@ def generate_pdf(path, d):
 
     cols = d["columns"]
     show_prices = d.get("show_prices", True)
-    price_kw = {"unit price", "total", "price", "amount"}
-    display_cols = cols if show_prices else [c for c in cols if c.lower() not in price_kw]
+    if not show_prices:
+        price_kw = {"unit price", "total", "price", "amount"}
+        display_cols = [c for c in cols if c.lower() not in price_kw]
+    else:
+        display_cols = cols
 
     if display_cols:
         cw = W / len(display_cols)
